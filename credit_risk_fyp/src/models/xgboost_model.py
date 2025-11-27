@@ -4,7 +4,7 @@ GPU-accelerated gradient boosting classifier
 """
 
 import logging
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Union
 from pathlib import Path
 
 import numpy as np

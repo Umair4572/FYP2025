@@ -29,9 +29,9 @@ for dir_path in [RAW_DATA_DIR, PROCESSED_DATA_DIR, SPLITS_DIR,
 # DATA CONFIGURATION
 # ============================================================================
 DATASET_CONFIG = {
-    'main_dataset': 'lending_club_2007_2020.csv',
+    'train_dataset': 'lending_club_train.csv',
     'test_dataset': 'lending_club_test.csv',
-    'target_column': 'loan_status',
+    'target_column': 'default',  # Binary: 0 = no default, 1 = default
     'id_column': 'id',
     'random_seed': 42
 }
@@ -75,21 +75,21 @@ PREPROCESSING_CONFIG = {
 }
 
 # Columns to drop (data leakage prevention)
+# These columns should be excluded as they would not be available at prediction time
+# or would leak information about the target variable
 LEAKAGE_COLUMNS = [
-    'loan_status', 'funded_amnt_inv', 'total_pymnt', 'total_pymnt_inv',
-    'total_rec_prncp', 'total_rec_int', 'total_rec_late_fee',
-    'recoveries', 'collection_recovery_fee', 'last_pymnt_d',
-    'last_pymnt_amnt', 'next_pymnt_d', 'last_credit_pull_d',
-    'collections_12_mths_ex_med', 'policy_code', 'out_prncp',
-    'out_prncp_inv', 'hardship_flag', 'debt_settlement_flag'
+    # Note: Adjust this list based on actual dataset columns
+    # The current dataset has 'default' as target which will be handled separately
 ]
 
 # Target encoding (binary classification)
+# NOTE: Target column 'default' is already binary encoded:
+# 0 = No default (good loan)
+# 1 = Default (bad loan)
 TARGET_ENCODING = {
-    'default_class': ['Charged Off', 'Default', 'Late (31-120 days)',
-                      'Late (16-30 days)', 'Does not meet the credit policy. Status:Charged Off'],
-    'non_default_class': ['Fully Paid', 'Does not meet the credit policy. Status:Fully Paid'],
-    'exclude_class': ['Current', 'In Grace Period']  # Exclude uncertain status
+    'is_binary': True,  # Target is already 0/1 encoded
+    'positive_class': 1,  # Default class
+    'negative_class': 0   # Non-default class
 }
 
 # ============================================================================

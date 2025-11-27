@@ -5,7 +5,7 @@ Provides optimized data loading with memory management and chunk processing
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
