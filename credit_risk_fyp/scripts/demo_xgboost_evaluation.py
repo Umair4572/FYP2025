@@ -33,43 +33,54 @@ print("=" * 80)
 # ============================================================================
 # STEP 1: LOAD DATA
 # ============================================================================
-print("\n[1/7] Loading training data...")
+print("\n[1/8] Loading training data...")
 train_path = RAW_DATA_DIR / DATASET_CONFIG['train_dataset']
-df = load_data(train_path, optimize=True, nrows=50000)  # Use subset for demo
-print(f"Loaded {len(df):,} rows")
+train_df = load_data(train_path, optimize=True, nrows=50000)  # Use 50k rows for demo
+print(f"Loaded {len(train_df):,} rows from training dataset")
+
+print("\n[1/8] Loading test data...")
+test_path = RAW_DATA_DIR / DATASET_CONFIG['test_dataset']
+test_df = load_data(test_path, optimize=True, nrows=10000)  # Use 10k rows for test
+print(f"Loaded {len(test_df):,} rows from test dataset")
 
 # ============================================================================
 # STEP 2: SPLIT DATA
 # ============================================================================
-print("\n[2/7] Splitting data...")
+print("\n[2/8] Preparing data...")
 target_col = DATASET_CONFIG['target_column']
 id_col = DATASET_CONFIG['id_column']
 
-# Separate features and target
-X = df.drop(columns=[target_col, id_col])
-y = df[target_col]
+# Training data: Split into train and validation
+X_train_full = train_df.drop(columns=[target_col, id_col])
+y_train_full = train_df[target_col]
 
-# Split: 70% train, 15% validation, 15% test
-X_temp, X_test, y_temp, y_test = train_test_split(
-    X, y, test_size=0.15, random_state=42, stratify=y
-)
+# Split training data: 85% train, 15% validation
 X_train, X_val, y_train, y_val = train_test_split(
-    X_temp, y_temp, test_size=0.176, random_state=42, stratify=y_temp  # 0.176 * 0.85 ≈ 0.15
+    X_train_full, y_train_full, test_size=0.15, random_state=42, stratify=y_train_full
 )
 
-print(f"Train set: {len(X_train):,} samples")
-print(f"Validation set: {len(X_val):,} samples")
-print(f"Test set: {len(X_test):,} samples")
+# Test data: Use loaded test dataset
+X_test = test_df.drop(columns=[target_col, id_col])
+y_test = test_df[target_col]
+
+print(f"Train set: {len(X_train):,} samples (from {DATASET_CONFIG['train_dataset']})")
+print(f"Validation set: {len(X_val):,} samples (from {DATASET_CONFIG['train_dataset']})")
+print(f"Test set: {len(X_test):,} samples (from {DATASET_CONFIG['test_dataset']})")
 print(f"Target distribution (train): {y_train.value_counts().to_dict()}")
+print(f"Target distribution (test): {y_test.value_counts().to_dict()}")
 
 # ============================================================================
 # STEP 3: PREPROCESSING
 # ============================================================================
-print("\n[3/7] Preprocessing data...")
+print("\n[3/8] Preprocessing data...")
 preprocessor = DataPreprocessor()
 
+# Combine X_train and y_train for preprocessing
+train_df_combined = X_train.copy()
+train_df_combined[target_col] = y_train
+
 # Fit on training data
-X_train_processed = preprocessor.fit_transform(X_train, y_train)
+X_train_processed, _ = preprocessor.fit_transform(train_df_combined)
 X_val_processed = preprocessor.transform(X_val)
 X_test_processed = preprocessor.transform(X_test)
 
@@ -83,7 +94,7 @@ print(f"Preprocessor saved to {preprocessor_path}")
 # ============================================================================
 # STEP 4: FEATURE ENGINEERING
 # ============================================================================
-print("\n[4/7] Engineering features...")
+print("\n[4/8] Engineering features...")
 feature_engineer = FeatureEngineer()
 
 # Fit on training data
@@ -101,7 +112,7 @@ print(f"Feature engineer saved to {fe_path}")
 # ============================================================================
 # STEP 5: TRAIN XGBOOST MODEL
 # ============================================================================
-print("\n[5/7] Training XGBoost model...")
+print("\n[5/8] Training XGBoost model...")
 print("This may take a few minutes...")
 
 # Update params for demo (reduce training time)
@@ -124,7 +135,7 @@ print(f"Model saved to {model_path}")
 # ============================================================================
 # STEP 6: MAKE PREDICTIONS
 # ============================================================================
-print("\n[6/7] Making predictions...")
+print("\n[6/8] Making predictions...")
 
 # Predictions on validation set
 y_val_proba = xgb_model.predict_proba(X_val_final)
@@ -139,7 +150,7 @@ print("Predictions completed!")
 # ============================================================================
 # STEP 7: EVALUATE MODEL
 # ============================================================================
-print("\n[7/7] Evaluating model...")
+print("\n[7/8] Evaluating model...")
 print("\nGenerating comprehensive evaluation report and visualizations...")
 
 evaluator = ModelEvaluator()
@@ -266,11 +277,19 @@ print("\n📄 Report Summary:")
 print(report_df[['roc_auc', 'accuracy', 'precision', 'recall', 'f1_score']])
 
 # ============================================================================
-# SUMMARY
+# STEP 8: SUMMARY
 # ============================================================================
 print("\n" + "=" * 80)
 print("EVALUATION COMPLETE!")
 print("=" * 80)
+
+print("\n📊 DATASETS USED:")
+print(f"  Training data: {DATASET_CONFIG['train_dataset']} ({len(train_df):,} rows)")
+print(f"  Test data: {DATASET_CONFIG['test_dataset']} ({len(test_df):,} rows)")
+print(f"  Train samples used: {len(X_train):,}")
+print(f"  Validation samples: {len(X_val):,} (from training dataset)")
+print(f"  Test samples: {len(X_test):,} (from test dataset)")
+
 print(f"\n✓ Model saved to: {model_path}")
 print(f"✓ Figures saved to: {evaluator.figures_dir}")
 print(f"✓ Reports saved to: {evaluator.reports_dir}")
@@ -284,7 +303,13 @@ print("  - Feature importance plot")
 print("  - CSV report with all metrics")
 
 print("\n" + "=" * 80)
-print("You can now:")
+print("IMPORTANT NOTES:")
+print("  - Validation results: From training dataset split")
+print("  - Test results: From SEPARATE test dataset")
+print("  - This ensures proper evaluation on unseen data")
+print("=" * 80)
+
+print("\nYou can now:")
 print("  1. Check the results/ directory for all visualizations")
 print("  2. Review the CSV report in results/reports/")
 print("  3. Use the saved model for predictions")

@@ -117,10 +117,10 @@ class XGBoostModel:
         if X_val is not None and y_val is not None:
             val_pred_proba = self.predict_proba(X_val)
             val_auc = roc_auc_score(y_val, val_pred_proba)
-            logger.info(f"✓ Training complete. Best iteration: {self.best_iteration}")
-            logger.info(f"✓ Validation AUC: {val_auc:.4f}")
+            logger.info(f"[OK] Training complete. Best iteration: {self.best_iteration}")
+            logger.info(f"[OK] Validation AUC: {val_auc:.4f}")
         else:
-            logger.info(f"✓ Training complete. Best iteration: {self.best_iteration}")
+            logger.info(f"[OK] Training complete. Best iteration: {self.best_iteration}")
 
         return self
 
@@ -141,7 +141,7 @@ class XGBoostModel:
         proba = self.predict_proba(X)
         return (proba >= threshold).astype(int)
 
-    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+    def predict_proba(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """
         Predict probability of default (class 1).
 
@@ -154,6 +154,7 @@ class XGBoostModel:
         if self.model is None:
             raise RuntimeError("Model not trained. Call train() first.")
 
+        # Create DMatrix directly from input
         dmatrix = xgb.DMatrix(X, feature_names=self.feature_names)
         return self.model.predict(dmatrix, iteration_range=(0, self.best_iteration + 1))
 

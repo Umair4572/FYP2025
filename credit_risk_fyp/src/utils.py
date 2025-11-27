@@ -62,6 +62,27 @@ def setup_logging(config: Optional[Dict] = None) -> logging.Logger:
     return logger
 
 
+def set_seed(seed: int = 42) -> None:
+    """
+    Set random seed for reproducibility across all libraries.
+
+    Args:
+        seed: Random seed value (default: 42)
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+
+    # Set TensorFlow seed if available
+    try:
+        import tensorflow as tf
+        tf.random.set_seed(seed)
+    except ImportError:
+        pass
+
+    # Set environment variables for deterministic behavior
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+
 def setup_gpu() -> None:
     """
     Configure GPU for optimal performance with TensorFlow and gradient boosting libraries.

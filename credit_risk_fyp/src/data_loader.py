@@ -362,3 +362,162 @@ def load_data(filepath: Union[str, Path], optimize: bool = True, **kwargs) -> pd
     """
     loader = DataLoader(optimize_dtypes=optimize, verbose=True)
     return loader.load_dataset(filepath, **kwargs)
+
+
+if __name__ == "__main__":
+    """
+    Run this module directly to view dataset information.
+
+    Usage:
+        python -m credit_risk_fyp.src.data_loader train  # View training data
+        python -m credit_risk_fyp.src.data_loader test   # View test data
+    """
+    import sys
+    from .config import DATASET_CONFIG
+
+    # Default to showing both if no argument
+    show_train = True
+    show_test = True
+
+    if len(sys.argv) > 1:
+        dataset_choice = sys.argv[1].lower()
+        if dataset_choice == 'train':
+            show_test = False
+        elif dataset_choice == 'test':
+            show_train = False
+        else:
+            print(f"Unknown option: {dataset_choice}")
+            print("Usage: python -m credit_risk_fyp.src.data_loader [train|test]")
+            sys.exit(1)
+
+    print("=" * 80)
+    print("CREDIT RISK FYP - DATASET VIEWER")
+    print("=" * 80)
+
+    loader = DataLoader(optimize_dtypes=True, verbose=True)
+
+    # Load and display training data
+    if show_train:
+        print("\n" + "=" * 80)
+        print("TRAINING DATASET")
+        print("=" * 80)
+
+        train_path = RAW_DATA_DIR / DATASET_CONFIG['train_dataset']
+        print(f"\nLoading from: {train_path}")
+
+        try:
+            train_df = loader.load_dataset(train_path)
+
+            print("\n" + "-" * 80)
+            print("DATASET INFORMATION")
+            print("-" * 80)
+            print(f"Shape: {train_df.shape[0]:,} rows x {train_df.shape[1]} columns")
+            print(f"Memory usage: {train_df.memory_usage(deep=True).sum() / (1024**2):.2f} MB")
+
+            # Target column info
+            target_col = DATASET_CONFIG['target_column']
+            if target_col in train_df.columns:
+                print(f"\nTarget column: '{target_col}'")
+                print(f"Target distribution:")
+                value_counts = train_df[target_col].value_counts()
+                for val, count in value_counts.items():
+                    pct = (count / len(train_df)) * 100
+                    print(f"  {val}: {count:,} ({pct:.2f}%)")
+                print(f"Missing values: {train_df[target_col].isna().sum():,}")
+
+            print(f"\n" + "-" * 80)
+            print("FIRST 5 ROWS")
+            print("-" * 80)
+            print(train_df.head())
+
+            print(f"\n" + "-" * 80)
+            print("COLUMN INFO")
+            print("-" * 80)
+            print(train_df.info())
+
+            print(f"\n" + "-" * 80)
+            print("MISSING VALUES")
+            print("-" * 80)
+            missing = train_df.isnull().sum()
+            missing = missing[missing > 0].sort_values(ascending=False)
+            if len(missing) > 0:
+                print(f"\nColumns with missing values (top 20):")
+                for col, count in missing.head(20).items():
+                    pct = (count / len(train_df)) * 100
+                    print(f"  {col:40s}: {count:8,} ({pct:6.2f}%)")
+            else:
+                print("No missing values found!")
+
+            print(f"\n" + "-" * 80)
+            print("BASIC STATISTICS")
+            print("-" * 80)
+            print(train_df.describe())
+
+        except Exception as e:
+            print(f"\n[ERROR] Failed to load training data: {e}")
+
+    # Load and display test data
+    if show_test:
+        print("\n" + "=" * 80)
+        print("TEST DATASET")
+        print("=" * 80)
+
+        test_path = RAW_DATA_DIR / DATASET_CONFIG['test_dataset']
+        print(f"\nLoading from: {test_path}")
+
+        try:
+            test_df = loader.load_dataset(test_path)
+
+            print("\n" + "-" * 80)
+            print("DATASET INFORMATION")
+            print("-" * 80)
+            print(f"Shape: {test_df.shape[0]:,} rows x {test_df.shape[1]} columns")
+            print(f"Memory usage: {test_df.memory_usage(deep=True).sum() / (1024**2):.2f} MB")
+
+            # Check if target column exists
+            target_col = DATASET_CONFIG['target_column']
+            if target_col in test_df.columns:
+                print(f"\nTarget column: '{target_col}'")
+                print(f"Target distribution:")
+                value_counts = test_df[target_col].value_counts()
+                for val, count in value_counts.items():
+                    pct = (count / len(test_df)) * 100
+                    print(f"  {val}: {count:,} ({pct:.2f}%)")
+                print(f"Missing values: {test_df[target_col].isna().sum():,}")
+            else:
+                print(f"\n[NOTE] Target column '{target_col}' not found in test dataset")
+
+            print(f"\n" + "-" * 80)
+            print("FIRST 5 ROWS")
+            print("-" * 80)
+            print(test_df.head())
+
+            print(f"\n" + "-" * 80)
+            print("COLUMN INFO")
+            print("-" * 80)
+            print(test_df.info())
+
+            print(f"\n" + "-" * 80)
+            print("MISSING VALUES")
+            print("-" * 80)
+            missing = test_df.isnull().sum()
+            missing = missing[missing > 0].sort_values(ascending=False)
+            if len(missing) > 0:
+                print(f"\nColumns with missing values (top 20):")
+                for col, count in missing.head(20).items():
+                    pct = (count / len(test_df)) * 100
+                    print(f"  {col:40s}: {count:8,} ({pct:6.2f}%)")
+            else:
+                print("No missing values found!")
+
+            print(f"\n" + "-" * 80)
+            print("BASIC STATISTICS")
+            print("-" * 80)
+            print(test_df.describe())
+
+        except Exception as e:
+            print(f"\n[ERROR] Failed to load test data: {e}")
+
+    print("\n" + "=" * 80)
+    print("DATASET VIEWER COMPLETE")
+    print("=" * 80)

@@ -152,6 +152,11 @@ class ModelEvaluator:
         metrics['threshold'] = threshold
         metrics['model_name'] = model_name
 
+        # Add sample count information
+        metrics['n_samples'] = len(y_true)
+        metrics['n_positive'] = int(np.sum(y_true))
+        metrics['n_negative'] = int(len(y_true) - np.sum(y_true))
+
         # Log key metrics
         logger.info(f"{model_name} Results:")
         logger.info(f"  AUC-ROC: {metrics.get('roc_auc', 0):.4f}")
@@ -612,32 +617,101 @@ def quick_evaluate(
 
     return metrics
 if __name__ == "__main__":
-    # Example usage when run directly
+    """
+    Test evaluation module with REAL credit risk data
+    """
+    import sys
+    from pathlib import Path
     import numpy as np
-    from sklearn.datasets import make_classification
     from sklearn.model_selection import train_test_split
-    
-    print("Generating sample data...")
-    X, y = make_classification(n_samples=1000, n_features=20, random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    
-    # Simulate predictions (replace with your actual model predictions)
-    y_pred_proba = np.random.rand(len(y_test))
-    
-    print("\nEvaluating model...")
-    evaluator = ModelEvaluator()
-    
+
+    # Add parent directory to path for imports
+    parent_dir = Path(__file__).parent.parent
+    sys.path.insert(0, str(parent_dir))
+
+    from src.config import RAW_DATA_DIR, DATASET_CONFIG
+    from src.data_loader import load_data
+    from src.preprocessor import DataPreprocessor
+    from src.models.xgboost_model import XGBoostModel
+
+    print("=" * 80)
+    print("EVALUATION MODULE TEST - USING REAL DATA")
+    print("=" * 80)
+
+    # Load REAL training data
+    print("\n[1/4] Loading REAL training data...")
+    train_path = RAW_DATA_DIR / DATASET_CONFIG['train_dataset']
+    df = load_data(train_path, optimize=True, nrows=15000)  # Use 15k for test
+    print(f"Loaded {len(df):,} rows from: {DATASET_CONFIG['train_dataset']}")
+
+    # Prepare data
+    target_col = DATASET_CONFIG['target_column']
+    id_col = DATASET_CONFIG['id_column']
+    X = df.drop(columns=[target_col, id_col])
+    y = df[target_col]
+
+    print(f"Class distribution: {y.value_counts().to_dict()}")
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    print(f"Train: {len(X_train):,} samples, Test: {len(X_test):,} samples")
+
+    # Preprocess
+    print("\n[2/4] Preprocessing data...")
+    preprocessor = DataPreprocessor()
+
+    # Combine X_train and y_train for preprocessing
+    train_df_combined = X_train.copy()
+    train_df_combined[target_col] = y_train
+
+    X_train_processed, _ = preprocessor.fit_transform(train_df_combined)
+    X_test_processed = preprocessor.transform(X_test)
+
+    # Train quick model
+    print("\n[3/4] Training quick XGBoost model...")
+    model = XGBoostModel(params={
+        'max_depth': 5,
+        'learning_rate': 0.1,
+        'n_estimators': 30,
+        'tree_method': 'hist',
+        'random_state': 42
+    })
+
+    # Use 80/20 split for train/val
+    X_tr, X_val, y_tr, y_val = train_test_split(
+        X_train_processed, y_train, test_size=0.2, random_state=42, stratify=y_train
+    )
+    model.train(X_tr, y_tr, X_val, y_val)
+
+    # Get predictions
+    y_pred_proba = model.predict_proba(X_test_processed)
+
     # Evaluate
-    metrics = evaluator.evaluate(y_test, y_pred_proba, model_name="Test_Model")
-    
-    # Generate plots
-    evaluator.evaluate_all_plots(y_test, y_pred_proba, model_name="Test_Model")
-    
-    print("\nResults:")
-    print(f"AUC-ROC: {metrics['roc_auc']:.4f}")
-    print(f"Accuracy: {metrics['accuracy']:.4f}")
-    print(f"Precision: {metrics['precision']:.4f}")
-    print(f"Recall: {metrics['recall']:.4f}")
-    print(f"F1-Score: {metrics['f1_score']:.4f}")
-    
+    print("\n[4/4] Evaluating model on test set...")
+    evaluator = ModelEvaluator()
+
+    metrics = evaluator.evaluate(y_test, y_pred_proba, model_name="Test_XGBoost")
+    evaluator.evaluate_all_plots(y_test, y_pred_proba, model_name="Test_XGBoost")
+
+    # Display results
+    print("\n" + "=" * 80)
+    print("RESULTS (TEST SET - REAL DATA)")
+    print("=" * 80)
+    print(f"\nDataset: {DATASET_CONFIG['train_dataset']}")
+    print(f"Total samples evaluated: {metrics['n_samples']:,}")
+    print(f"Positive class (defaults): {metrics['n_positive']:,}")
+    print(f"Negative class (no defaults): {metrics['n_negative']:,}")
+
+    print(f"\nMetrics:")
+    print(f"AUC-ROC:     {metrics['roc_auc']:.4f}")
+    print(f"Accuracy:    {metrics['accuracy']:.4f}")
+    print(f"Precision:   {metrics['precision']:.4f}")
+    print(f"Recall:      {metrics['recall']:.4f}")
+    print(f"F1-Score:    {metrics['f1_score']:.4f}")
+
     print(f"\nPlots saved to: {evaluator.figures_dir}")
+    print("=" * 80)
+    print("SUCCESS! Evaluation module working with REAL credit risk data.")
+    print("=" * 80)

@@ -89,7 +89,11 @@ LEAKAGE_COLUMNS = [
 TARGET_ENCODING = {
     'is_binary': True,  # Target is already 0/1 encoded
     'positive_class': 1,  # Default class
-    'negative_class': 0   # Non-default class
+    'negative_class': 0,   # Non-default class
+    # For preprocessor compatibility (target is already 0/1)
+    'default_class': [1],  # Values that mean default
+    'non_default_class': [0],  # Values that mean no default
+    'exclude_class': []  # No values to exclude
 }
 
 # ============================================================================
