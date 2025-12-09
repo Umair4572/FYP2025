@@ -117,8 +117,7 @@ FEATURE_ENGINEERING_CONFIG = {
 XGBOOST_PARAMS = {
     'objective': 'binary:logistic',
     'eval_metric': 'auc',
-    'tree_method': 'gpu_hist',
-    'predictor': 'gpu_predictor',
+    'tree_method': 'hist',  # Use 'hist' for CPU, 'gpu_hist' for GPU
     'max_depth': 8,
     'learning_rate': 0.05,
     'n_estimators': 1000,

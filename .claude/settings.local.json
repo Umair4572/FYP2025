@@ -9,7 +9,11 @@
       "Bash(pip install:*)",
       "Bash(where:*)",
       "Bash(C:UsersFaheemAppDataLocalProgramsPythonPython313python.exe -m pip install xgboost scikit-learn pandas numpy matplotlib seaborn scipy tqdm joblib)",
-      "Bash(py -3.13 -m pip install:*)"
+      "Bash(py -3.13 -m pip install:*)",
+      "Bash(del \"credit_risk_fyp\\notebooks\\xgboost_training.ipynb\")",
+      "Bash(C:UsersFaheemAppDataLocalProgramsPythonPython313python.exe -m pip install imbalanced-learn)",
+      "Bash(tee:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

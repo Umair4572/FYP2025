@@ -15,8 +15,9 @@ from sklearn.metrics import (
     accuracy_score, auc, brier_score_loss, cohen_kappa_score,
     confusion_matrix, f1_score, log_loss, matthews_corrcoef,
     precision_recall_curve, precision_score, recall_score,
-    roc_auc_score, roc_curve
+    roc_auc_score, roc_curve, average_precision_score
 )
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 
 from .config import FIGURES_DIR, REPORTS_DIR, VISUALIZATION_CONFIG
 
@@ -434,6 +435,140 @@ class ModelEvaluator:
                    f"(score: {best_score:.4f})")
 
         return best_threshold, best_score
+
+    def calibrate_probabilities(
+        self,
+        y_true: np.ndarray,
+        y_pred_proba: np.ndarray,
+        method: str = 'isotonic',
+        cv: int = 5
+    ) -> Tuple[np.ndarray, Dict[str, float]]:
+        """
+        Calibrate predicted probabilities for better reliability.
+
+        Args:
+            y_true: True labels
+            y_pred_proba: Uncalibrated predicted probabilities
+            method: Calibration method ('sigmoid' for Platt scaling, 'isotonic' for isotonic regression)
+            cv: Number of cross-validation folds (not used for direct calibration)
+
+        Returns:
+            Tuple of (calibrated_probabilities, calibration_metrics)
+        """
+        from sklearn.calibration import calibration_curve
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.isotonic import IsotonicRegression
+
+        logger.info(f"Calibrating probabilities using {method} method...")
+
+        # Store original metrics
+        original_brier = brier_score_loss(y_true, y_pred_proba)
+        original_log_loss = log_loss(y_true, y_pred_proba)
+
+        # Apply calibration
+        if method == 'sigmoid':
+            # Platt scaling (logistic regression)
+            calibrator = LogisticRegression()
+            calibrator.fit(y_pred_proba.reshape(-1, 1), y_true)
+            y_calibrated = calibrator.predict_proba(y_pred_proba.reshape(-1, 1))[:, 1]
+        elif method == 'isotonic':
+            # Isotonic regression
+            calibrator = IsotonicRegression(out_of_bounds='clip')
+            y_calibrated = calibrator.fit_transform(y_pred_proba, y_true)
+        else:
+            raise ValueError(f"Unknown calibration method: {method}. Use 'sigmoid' or 'isotonic'")
+
+        # Calculate calibrated metrics
+        calibrated_brier = brier_score_loss(y_true, y_calibrated)
+        calibrated_log_loss = log_loss(y_true, y_calibrated)
+
+        # Calculate calibration curve metrics
+        prob_true, prob_pred = calibration_curve(y_true, y_pred_proba, n_bins=10)
+        prob_true_cal, prob_pred_cal = calibration_curve(y_true, y_calibrated, n_bins=10)
+
+        # Expected Calibration Error (ECE)
+        ece_before = np.mean(np.abs(prob_true - prob_pred))
+        ece_after = np.mean(np.abs(prob_true_cal - prob_pred_cal))
+
+        calibration_metrics = {
+            'method': method,
+            'brier_score_before': original_brier,
+            'brier_score_after': calibrated_brier,
+            'brier_improvement': original_brier - calibrated_brier,
+            'log_loss_before': original_log_loss,
+            'log_loss_after': calibrated_log_loss,
+            'log_loss_improvement': original_log_loss - calibrated_log_loss,
+            'ece_before': ece_before,
+            'ece_after': ece_after,
+            'ece_improvement': ece_before - ece_after
+        }
+
+        logger.info(f"Calibration complete:")
+        logger.info(f"  Brier score: {original_brier:.4f} → {calibrated_brier:.4f} "
+                   f"(improvement: {calibration_metrics['brier_improvement']:.4f})")
+        logger.info(f"  Log loss: {original_log_loss:.4f} → {calibrated_log_loss:.4f} "
+                   f"(improvement: {calibration_metrics['log_loss_improvement']:.4f})")
+        logger.info(f"  ECE: {ece_before:.4f} → {ece_after:.4f} "
+                   f"(improvement: {calibration_metrics['ece_improvement']:.4f})")
+
+        return y_calibrated, calibration_metrics
+
+    def plot_calibration_curve(
+        self,
+        y_true: np.ndarray,
+        y_pred_proba: np.ndarray,
+        y_calibrated_proba: np.ndarray = None,
+        model_name: str = "Model",
+        n_bins: int = 10,
+        save: bool = True
+    ) -> plt.Figure:
+        """
+        Plot calibration curve showing probability calibration.
+
+        Args:
+            y_true: True labels
+            y_pred_proba: Uncalibrated predicted probabilities
+            y_calibrated_proba: Calibrated probabilities (optional)
+            model_name: Name of the model
+            n_bins: Number of bins for calibration curve
+            save: Whether to save the figure
+
+        Returns:
+            Matplotlib figure
+        """
+        fig, ax = plt.subplots(figsize=self.figsize)
+
+        # Plot perfectly calibrated line
+        ax.plot([0, 1], [0, 1], 'k--', linewidth=2, label='Perfect Calibration')
+
+        # Plot uncalibrated curve
+        prob_true, prob_pred = calibration_curve(y_true, y_pred_proba, n_bins=n_bins)
+        ax.plot(prob_pred, prob_true, marker='o', linewidth=2,
+                label=f'Uncalibrated (Brier: {brier_score_loss(y_true, y_pred_proba):.4f})')
+
+        # Plot calibrated curve if provided
+        if y_calibrated_proba is not None:
+            prob_true_cal, prob_pred_cal = calibration_curve(y_true, y_calibrated_proba, n_bins=n_bins)
+            ax.plot(prob_pred_cal, prob_true_cal, marker='s', linewidth=2,
+                   label=f'Calibrated (Brier: {brier_score_loss(y_true, y_calibrated_proba):.4f})')
+
+        ax.set_xlabel('Mean Predicted Probability', fontsize=12)
+        ax.set_ylabel('Fraction of Positives', fontsize=12)
+        ax.set_title(f'Calibration Curve - {model_name}', fontsize=14, fontweight='bold')
+        ax.legend(loc='best', fontsize=10)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
+
+        plt.tight_layout()
+
+        if save:
+            filename = f'calibration_curve_{model_name.lower().replace(" ", "_")}.png'
+            save_path = self.figures_dir / filename
+            fig.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+            logger.info(f"Calibration curve saved to {save_path}")
+
+        return fig
 
     def compare_models(
         self,
