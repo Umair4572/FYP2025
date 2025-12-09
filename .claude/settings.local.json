@@ -13,7 +13,12 @@
       "Bash(del \"credit_risk_fyp\\notebooks\\xgboost_training.ipynb\")",
       "Bash(C:UsersFaheemAppDataLocalProgramsPythonPython313python.exe -m pip install imbalanced-learn)",
       "Bash(tee:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(C:UsersFaheemAppDataLocalProgramsPythonPython313python.exe -m pip install tensorflow --timeout 300)",
+      "Bash(del \"credit_risk_fyp\\notebooks\\neural_network_clean.ipynb\")",
+      "Bash(del \"credit_risk_fyp\\notebooks\\neural_network_results.ipynb\")",
+      "Bash(del neural_network_results.ipynb)"
     ],
     "deny": [],
     "ask": []
